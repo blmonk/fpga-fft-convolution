@@ -20,6 +20,14 @@ def decimation(sig):
         switched_sig[i] = sig[reverse_bits(i, num_bits)]
     return switched_sig
 
+def circular_left_shift(num, shift_bits, total_bits):
+    # Make sure the shift_bits is within the range of total_bits
+    shift_bits %= total_bits
+    # Perform the circular left shift
+    result = ((num << shift_bits) | (num >> (total_bits - shift_bits))) & ((1 << total_bits) - 1)
+    
+    return result
+
 def fft_alg(sig):
     sig = np.array(sig)
     n_total = len(sig)
@@ -35,28 +43,26 @@ def fft_alg(sig):
 
     y = decimation(sig) # decimation in time: switch around numbers first
     y_temp = np.zeros(n_total, dtype=complex) # array for holding temporary result
-    # first loop: number of fft stages 
-    for stage in range(1, n_stages + 1):
-        n = 2**stage # sub fft size, starts at 2
-
-        # 2nd loop: iterations = number of sub ffts 
-        # n_total/2 ... 4, 2, 1 = n_total/n
-        for sub_fft in range(0, int(n_total/n)):
-            # index offset of sub fft depends on sub fft size and iteration
-            offset = sub_fft * n
-            # for each sub fft, there are n/2 number of twiddle factors
-            ndiv2 = int(n/2)
-            for i in range(0, ndiv2):
-                odd_prod = twiddle_factors[int((n_total/n) * i)] * y[offset + i + ndiv2]
-                y_temp[offset + i] = y[offset + i] + odd_prod
-                y_temp[offset + i + ndiv2] = y[offset + i] - odd_prod
+    # outer loop: number of fft stages 
+    for stage in range(0, n_stages):
+        # 2nd loop: n_total/2 twiddle factor computations per stage
+        ndiv2 = int(n_total/2)
+        for pair in range(0, ndiv2):
+            # generate butterfly address pair
+            address = [circular_left_shift(2*pair, stage, n_stages), circular_left_shift(2*pair+ 1, stage, n_stages)]
+            # create mask of ones in n_stages-1-stage LSBs
+            mask = (1<< (n_stages-1-stage)) - 1
+            # perform butterfly operation
+            odd_prod = twiddle_factors[pair & ~mask] * y[address[1]]
+            y_temp[address[0]] = y[address[0]] + odd_prod
+            y_temp[address[1]] = y[address[0]] - odd_prod
 
         y = y_temp.copy()
-    
+
     return y
 
 
-n = 16 
+n = 16
 # create random signal
 signal = np.arange(n)
 
@@ -67,5 +73,3 @@ print(fft_result)
 # custom fft:
 fft_result = fft_alg(signal)
 print(fft_result)
-
-
