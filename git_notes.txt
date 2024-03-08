@@ -33,5 +33,6 @@ Committing/pushing changes:
 Submitting/merging pull request
 1. On github, option to create pull request should appear on branch
 2. If there are conflicts, github will say which files and you choose which lines to keep
+***IMPORTANT***: make sure it says you're merging into development and not main (I already messed this up once lol)
 3. Click "merge pull request"
 4. Optionally delete the branch
