@@ -1,0 +1,38 @@
+How to use git "properly" lmao
+
+Basic workflow:
+The development branch should be the base branch that we merge into
+Feature branches are created based off the development branch
+A feature is basically a single task
+    in our case this would be like twiddle LUT, FFT, inverse FFT, audio input/output handling, etc.
+    it might make sense to create one feature per module?
+    ideally we aren't working on the same feature at the same time
+Feature branches should be merged into the development branch once the feature is done/stable 
+Eventually, we merge the development branch into main
+    (we can decide when this is)
+
+Steps for working on a feature:
+1. Create new feature branch or checkout existing feature branch
+    - To create a new branch:
+        1. On github, go to "branches"
+        2. Click new branch at top right and choose source branch 
+            (for us the source should probably always be development)
+2. "git fetch" to update list of remote branches
+3. "git checkout <branch name>" to switch to branch
+4. If working on an existing branch, "git pull" to ensure branch is up to date
+5. Work on the feature, pushing changes as you go
+6. When feature is ready/stable, merge to development
+
+Committing/pushing changes:
+1. "git pull" to get most recent changes on current branch from github
+2. Make whatever edits to the files in your branch
+3. Use "git add --all" to stage changes for commit
+4. Use "git commit -m "<insert message here>" "  to commit local changes 
+5. Use "git push" to push changes to github
+
+Submitting/merging pull request
+1. On github, option to create pull request should appear on branch
+2. If there are conflicts, github will say which files and you choose which lines to keep
+***IMPORTANT***: make sure it says you're merging into development and not main (I already messed this up once lol)
+3. Click "merge pull request"
+4. Optionally delete the branch
