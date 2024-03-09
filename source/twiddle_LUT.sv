@@ -17,16 +17,18 @@ module twiddle_LUT #(parameter FFT_POINTS = 1024, parameter LUT_POINTS = 8192, D
         $readmemh("cos_lut.mem", cos_lut);
     end
 
+    logic [$clog2(LUT_POINTS)-1:0] real_index, imag_index;  // index of real/imag part in LUT memory
+    localparam offset = LUT_POINTS / 4;         // offset to get -sin from cos
+
     // Compute the twiddle factors
     always_comb begin
         // if LUT_POINTS > FFT_POINTS, we need different index
-        int lut_index = index * (LUT_POINTS / FFT_POINTS);
-
-        twiddle_real = cos_lut[lut_index];
+        real_index = index << $clog2(LUT_POINTS / FFT_POINTS);
+        twiddle_real = cos_lut[real_index];
 
         // Compute the imaginary part (-sin) using shifted cos function
-        int offset = LUT_POINTS / 4; // offset for -sin function
-        int imag_index = (lut_index + offset) % LUT_POINTS;
+        // imag_index = (real_index + offset) % LUT_POINTS;
+        imag_index = (real_index + offset);
         twiddle_imag = cos_lut[imag_index];
     end
 
