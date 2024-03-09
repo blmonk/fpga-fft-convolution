@@ -2,6 +2,35 @@
 
 import numpy as np
 
+
+def num_to_fixed(number, total_bits, fractional_bits):
+    max_int = (1 << (total_bits - 1)) - 1
+    min_int = -(1 << (total_bits - 1))
+    
+    if number > max_int:
+        number = max_int
+    elif number < min_int:
+        number = min_int
+    
+    # Adjust for negative numbers
+    if number < 0:
+        number += (1 << total_bits)
+    
+    integer_part = int(number)
+    fractional_part = round((number - integer_part) * (1 << fractional_bits))
+    
+    combined = (integer_part << fractional_bits) | fractional_part
+    
+    hex_str = hex(combined)[2:]
+    
+    # If the number of bits in the hex representation is greater than required, trim it
+    if len(hex_str) > total_bits // 4:
+        hex_str = hex_str[-(total_bits // 4):]
+    else:
+        hex_str = hex_str.zfill(total_bits // 4)
+    
+    return hex_str.upper()
+
 # returns binary mirror of num_to_mirror using the num_bits binary representation
 def reverse_bits(n, num_bits):
     result = 0
@@ -38,8 +67,9 @@ def fft_alg(sig):
     twiddle_factors = np.zeros(n_total, dtype=complex)
     for i in range(n_total):
         twiddle_real = np.cos(2*np.pi*i / n_total)
-        twiddle_imag = np.sin(2*np.pi*i / n_total)
-        twiddle_factors[i] = twiddle_real - 1j*twiddle_imag
+        twiddle_imag = -np.sin(2*np.pi*i / n_total)
+        twiddle_factors[i] = twiddle_real + 1j*twiddle_imag
+        # print(i, num_to_fixed(twiddle_real, 24, 22), num_to_fixed(twiddle_imag, 24, 22))
 
     y = decimation(sig) # decimation in time: switch around numbers first
     y_temp = np.zeros(n_total, dtype=complex) # array for holding temporary result
