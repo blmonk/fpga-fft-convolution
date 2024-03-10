@@ -16,8 +16,10 @@ def generate_lut_file(lut_points, total_bits, fractional_bits, filename):
             scaled_val = to_twos_complement(int(round(scaled_val)), total_bits)
             f.write("{:0{width}X}\n".format(scaled_val, width=total_bits//4))
 
-lut_points = 8192
 total_bits = 24
 fractional_bits = 22
-filename = "cos_lut.mem"
-generate_lut_file(lut_points, total_bits, fractional_bits, filename)
+
+for i in range(4,14):
+    lut_points = int(2**i)
+    filename = "lut_files/cos_lut_" + str(lut_points) + ".mem"
+    generate_lut_file(lut_points, total_bits, fractional_bits, filename)

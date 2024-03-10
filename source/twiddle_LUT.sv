@@ -1,35 +1,25 @@
 // lookup table for twiddle factors
-// the values used for the LUT are taken from cos_lut.mem 
-// This is the function cos(2*pi*i/LUT_POINTS) and has size LUT_POINTS (i is an integer)
-// FFT_POINTS can be less than or equal to LUT_POINTS, both always a power of 2
-// The point is that any fft size less than size LUT_POINTS can be generated without changing the file cos_lut.mem
-// make sure LUT_POINTS/DATA_WIDTH matches the length/data width of cos_lut.mem
+// the values used for the LUT are taken from cos_lut_<FFT_POINTS>.mem 
+// This is the function cos(2*pi*i/FFT_POINTS) and has size FFT_POINTS (i is an integer)
+// make sure FFT_POINTS matches the specific cos_lut filename
 
-module twiddle_LUT #(parameter FFT_POINTS = 1024, parameter LUT_POINTS = 8192, DATA_WIDTH = 24)(
-    input logic [$clog2(FFT_POINTS)-1:0] index,         // twiddle factor index (width = log2(FFT_POINTS))
-    output logic signed [DATA_WIDTH-1:0] twiddle_real,  // real part 
-    output logic signed [DATA_WIDTH-1:0] twiddle_imag   // imaginary part (already includes negative sign)
+module twiddle_LUT #(parameter FFT_POINTS = 16, FILENAME="cos_lut_16.mem", DATA_WIDTH = 24)(
+    output logic signed [DATA_WIDTH-1:0] twiddle_real [0:FFT_POINTS-1],  // real part (cos)
+    output logic signed [DATA_WIDTH-1:0] twiddle_imag [0:FFT_POINTS-1]   // imaginary part (-sin)
 );
 
     // create cosine LUT from .mem file
-    reg signed [DATA_WIDTH-1:0] cos_lut [0:LUT_POINTS-1];
     initial begin
-        $readmemh("cos_lut.mem", cos_lut);
+        $readmemh(FILENAME, twiddle_real);
     end
 
-    logic [$clog2(LUT_POINTS)-1:0] real_index, imag_index;  // index of real/imag part in LUT memory
-    localparam offset = LUT_POINTS / 4;         // offset to get -sin from cos
+    localparam offset = FFT_POINTS / 4; // offset to get -sin from cos
 
-    // Compute the twiddle factors
+    integer i;
     always_comb begin
-        // if LUT_POINTS > FFT_POINTS, we need different index
-        real_index = index << $clog2(LUT_POINTS / FFT_POINTS);
-        twiddle_real = cos_lut[real_index];
-
-        // Compute the imaginary part (-sin) using shifted cos function
-        // imag_index = (real_index + offset) % LUT_POINTS;
-        imag_index = (real_index + offset);
-        twiddle_imag = cos_lut[imag_index];
+        for (i=0; i<FFT_POINTS; i++) begin
+            twiddle_imag[i] = twiddle_real[(i + offset) % FFT_POINTS];
+        end
     end
 
 endmodule
