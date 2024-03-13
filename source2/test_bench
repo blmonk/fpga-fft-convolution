@@ -1,0 +1,158 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 03/12/2024 05:41:30 PM
+// Design Name: 
+// Module Name: tb_FFT
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module tb_FFT();
+
+    reg aclk;        //assinging from instantiation tab
+    reg aresetn;
+    
+    reg [31:0] in_data;    //again 32 bit 
+    reg in_valid;
+    reg in_last;
+    wire in_ready;
+    
+    reg [7:0] config_data;
+    reg config_valid;
+    wire config_ready;
+    
+    wire [31:0] out_data;
+    wire out_valid;
+    wire out_last;
+    reg out_ready;
+    
+    reg [31:0] input_data [15:0]; //creating storage for input data for fft since i chose
+                                   //16 inputs each 32 bits
+                                   // curious as to how I would be able to input more without typing them all
+    
+    integer i;                    //used later for a loop
+    
+    top_wrapper tb_in(
+    .aclk(aclk),
+    .aresetn(aresetn),
+    
+    .in_data(in_data),
+    .in_valid(in_valid),
+    .in_last(in_last),
+    .in_ready(in_ready),
+    
+    .config_data(config_data),
+    .config_valid(config_valid),
+    .config_ready(config_ready),
+    
+    .out_data(out_data),
+    .out_valid(out_valid),
+    .out_last(out_last),
+    .out_ready(out_ready)
+
+  );
+  
+   always
+   begin
+    #5 aclk = ~aclk;  //10 unit period clk
+                    
+   end
+   
+   initial begin
+    aclk = 0;        //want reset low
+    aresetn = 0;
+    
+    in_valid = 1'b0;  //assign bit size and everything set to 0
+    in_data = 32'd0;
+    in_last = 1'b0;
+    
+    out_ready = 1'b1;  //output is set to 1 so we know the outut is ready as is
+    
+    config_data = 8'd0;  // remember this is to 7 (8 bit) from wrapper
+    config_valid = 1'b0;
+    
+   end
+   
+   initial begin
+    #70                  // need atleast 2 cycles before reset so we have 70 delay
+    aresetn = 1;
+    
+    //input generated from sin fft on python and converted to 32bit
+    
+    input_data[0] = 32'b00111111101010100011110101110001;
+    input_data[1] = 32'b00111111101100001010001111010111;
+    input_data[2] = 32'b00111111110001010001111010111000;
+    input_data[3] = 32'b00111111111000111101011100001010;
+    input_data[4] = 32'b01000000000001110000101000111101;
+    input_data[5] = 32'b01000000001000000010000011000101;
+    input_data[6] = 32'b01000000001110111000010100011111;
+    input_data[7] = 32'b01000000010101111010111000010100;
+    input_data[8] = 32'b01000000011100111101011100001010;
+    input_data[9] = 32'b01000000100100100011110101110001;
+    input_data[10] = 32'b01000000100110110011001100110011;
+    input_data[11] = 32'b01000000101000010100011110101110;
+    input_data[12] = 32'b01000000101001000111101011100001;
+    input_data[13] = 32'b01000000101001000010100011110110;
+    input_data[14] = 32'b01000000101000000101000111101100;
+    input_data[15] = 32'b01000000100110001111010111000011;
+   
+   end
+   
+   initial begin
+    #100                //for our config signal to say we are ready for forward ft
+    // can set config to 0 for inverese fft?
+    config_data = 1;
+    #5 config_valid = 1;  //it is valid after about half a cycle
+    
+    while(config_ready == 0) begin //waiting for fft to generate, not ready to take data
+        config_valid = 1;
+     end
+    #5 config_valid = 0; //now that is is ready set to zero / low
+    
+    end
+    
+    initial begin
+    #100
+    for (i = 15; i>=0; i=i-1)begin
+        #10
+        if (i==0)begin
+        
+            in_last = 1'b1; //last signal is zero when there is no more input
+                            //we have 16 inputs, so after we run through them all and i=0 then last is high
+        end
+        
+        in_data = input_data[i];  //data put to in_data port
+        in_valid = 1'b1;     // the in data is valid / high
+        
+        while (in_ready == 0) begin //waiting for axi to set in ready to 1
+            in_valid = 1'b1;  //now our in valid stays at 1 while waiting
+            
+         end
+       end
+       
+       #10 // after that is done we can set in valid and last back to zero
+       in_valid = 1'b0;
+       in_last = 1'b0;
+       
+      end
+      
+      initial begin
+        #100                //let it run for about 100 seconds to store everything
+        wait(out_valid == 1);  // wait for out valid to be high, meaning our out is ready to generated
+        #300 out_ready = 1'b0;  //give 300 delay so our out data is all ready and then set to zero
+       end     
+   
+endmodule
