@@ -1,20 +1,24 @@
 // contains both a axi stream master and slave controller
-module fft_controller #(parameter FFT_POINTS = 16, DATA_WIDTH = 24) (
+module fft_controller #(parameter FFT_POINTS = 16, DATA_WIDTH = 24,
+    LOG2_POINTS = $clog2(FFT_POINTS),
+    // num output bits = num input bits + log2(N) + 1 rounded to neares multiple of 8
+    OUTPUT_WIDTH = ((DATA_WIDTH + LOG2_POINTS + 8) / 8) * 8
+)
+(
     input logic clk, reset,
     input logic start_fft,
-    input logic [DATA_WIDTH-1:0] in_data [0:FFT_POINTS-1],
-    output logic [31:0] out_data_real [0:FFT_POINTS-1],
-    output logic [31:0] out_data_imag [0:FFT_POINTS-1],
+    input logic forward_inverse,
+    input logic signed [DATA_WIDTH-1:0] in_data_real [0:FFT_POINTS-1],
+    input logic signed [DATA_WIDTH-1:0] in_data_imag [0:FFT_POINTS-1],
+    output logic signed [OUTPUT_WIDTH-1:0] out_data_real [0:FFT_POINTS-1],
+    output logic signed [OUTPUT_WIDTH-1:0] out_data_imag [0:FFT_POINTS-1],
     output logic fft_data_valid,
     output logic fft_in_prog
 );
 
-
-    localparam LOG2_POINTS = $clog2(FFT_POINTS);
-
     // internal register for holding in_data
     // lowest half of bits = real 
-    // highest half of bits = imaginary
+    // highest half of bits = imaginary (all 0 for input)
     logic [2*DATA_WIDTH-1:0] local_in_data [0:FFT_POINTS-1] = '{default:0};
 
     int i;
@@ -28,7 +32,8 @@ module fft_controller #(parameter FFT_POINTS = 16, DATA_WIDTH = 24) (
             fft_in_prog <= 1;
             // load in_data into local_in_data if start_fft is high
             for (i=0; i<FFT_POINTS; i++) begin
-                local_in_data[i][DATA_WIDTH-1:0] <= in_data[i];
+                local_in_data[i][DATA_WIDTH-1:0] <= in_data_real[i];
+                local_in_data[i][2*DATA_WIDTH-1:DATA_WIDTH] <= in_data_imag[i];
             end
         end
     end 
@@ -38,8 +43,9 @@ module fft_controller #(parameter FFT_POINTS = 16, DATA_WIDTH = 24) (
     logic axis_m_valid = 0; // master writes 1 to this if ready to send data
     logic axis_m_ready;     // slave writes 1 to this if ready to receive data
     logic axis_m_last = 0;  // master writes 1 if current frame is the last one
-    logic [LOG2_POINTS:0] m_count;
-    logic m_write_in_prog = 0; // 
+
+    logic [LOG2_POINTS:0] m_count; // counts number of words sent
+    logic m_write_in_prog = 0; // keeps track of when we're writing so no repeat writes
 
     always_ff @(posedge clk) begin
         if (reset == 1'b1) begin
@@ -60,7 +66,7 @@ module fft_controller #(parameter FFT_POINTS = 16, DATA_WIDTH = 24) (
                 m_count <= m_count + 1;
             end
             // last logic 
-            if (m_count == FFT_POINTS-1 && axis_m_ready == 1'b1) begin // ex. FFT size = 8, want to check when count = 6 since last should be high on 7
+            if (m_count == FFT_POINTS-1 && axis_m_ready == 1'b1) begin 
                 axis_m_last <= 1;
             end
             else axis_m_last <= 0;
@@ -81,27 +87,27 @@ module fft_controller #(parameter FFT_POINTS = 16, DATA_WIDTH = 24) (
 
     always_ff @(posedge clk) begin
         if (reset == 1'b1) begin
-            axis_m_config_data <= 8'd1;
+            axis_m_config_data <= {7'd0, forward_inverse};
             axis_m_config_valid = 1;
         end
     end
 
     // axi slave (receive output of fft block)
-    logic [63:0] axis_s_data; // data stream value to receive from master
+    logic [2*OUTPUT_WIDTH-1:0] axis_s_data; // data stream value to receive from master
     logic axis_s_valid; // master writes 1 to this if ready to send data
     logic axis_s_ready = 0;     // slave writes 1 to this if ready to receive data
     logic axis_s_last;  // master writes 1 to this on last data frame
-    logic [LOG2_POINTS-1:0] s_count; // index 
+
+    logic [LOG2_POINTS-1:0] s_count; // counts how many words received
 
     always_ff @(posedge clk) begin
         if (reset == 1'b1) begin
             axis_s_ready <= 0;
-            // axis_s_data <= 63'd0;
             s_count <= 0;
         end
         else if (axis_s_valid && axis_s_ready) begin
-            out_data_real[s_count] <= axis_s_data[31:0];
-            out_data_imag[s_count] <= axis_s_data[63:32];
+            out_data_real[s_count] <= axis_s_data[OUTPUT_WIDTH-1:0];
+            out_data_imag[s_count] <= axis_s_data[2*OUTPUT_WIDTH-1:OUTPUT_WIDTH];
             s_count <= s_count + 1;
             if (axis_s_last == 1'b1) begin
                 axis_s_ready <= 0;
